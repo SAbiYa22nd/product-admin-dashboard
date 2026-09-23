@@ -17,7 +17,9 @@ export default function Products() {
   const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState("");
 
-  // Load categories
+  const [sortBy, setSortBy] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
+
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -34,7 +36,6 @@ export default function Products() {
     loadCategories();
   }, []);
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchText);
@@ -44,10 +45,9 @@ export default function Products() {
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  // Load products
   useEffect(() => {
     fetchProducts();
-  }, [page, pageSize, search, category]);
+  }, [page, pageSize, search, category, sortBy, sortOrder]);
 
   const fetchProducts = async () => {
     try {
@@ -76,7 +76,31 @@ export default function Products() {
 
       const data = await response.json();
 
-      setProducts(data.products);
+      let result = [...data.products];
+
+      if (sortBy) {
+        result.sort((a, b) => {
+          let valueA = a[sortBy];
+          let valueB = b[sortBy];
+
+          if (sortBy === "title") {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+          }
+
+          if (valueA < valueB) {
+            return sortOrder === "asc" ? -1 : 1;
+          }
+
+          if (valueA > valueB) {
+            return sortOrder === "asc" ? 1 : -1;
+          }
+
+          return 0;
+        });
+      }
+
+      setProducts(result);
       setTotal(data.total);
     } catch (error) {
       console.error(error);
@@ -123,7 +147,6 @@ export default function Products() {
         </h1>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search */}
           <input
             type="text"
             value={searchText}
@@ -132,7 +155,6 @@ export default function Products() {
             className="border border-gray-300 rounded-lg px-4 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500"
           />
 
-          {/* Category */}
           <select
             value={category}
             onChange={(e) => {
@@ -150,7 +172,29 @@ export default function Products() {
             ))}
           </select>
 
-          {/* Page size */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2 bg-white"
+          >
+            <option value="">Sort by</option>
+            <option value="title">Title</option>
+            <option value="price">Price</option>
+            <option value="rating">Rating</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 bg-white"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+
           <select
             value={pageSize}
             onChange={(e) => {
@@ -166,7 +210,6 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Desktop table */}
       <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-gray-100">
@@ -192,13 +235,9 @@ export default function Products() {
                 </td>
 
                 <td className="p-4 font-medium">{product.title}</td>
-
                 <td className="p-4">{product.category}</td>
-
                 <td className="p-4">${product.price}</td>
-
                 <td className="p-4">⭐ {product.rating}</td>
-
                 <td className="p-4">{product.stock}</td>
               </tr>
             ))}
@@ -206,14 +245,12 @@ export default function Products() {
         </table>
       </div>
 
-      {/* Empty state */}
       {products.length === 0 && (
         <div className="bg-white mt-4 p-8 rounded-xl text-center">
           <p className="text-gray-500">No products found.</p>
         </div>
       )}
 
-      {/* Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
         <p className="text-gray-600">
           Showing {startItem}–{endItem} of {total}
