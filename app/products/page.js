@@ -74,10 +74,33 @@ export default function Products() {
         throw new Error("Failed to fetch products");
       }
 
-      const data = await response.json();
+     const data = await response.json();
 
-      let result = [...data.products];
+const addedProducts = JSON.parse(
+  localStorage.getItem("addedProducts") || "[]"
+);
 
+let localProducts = addedProducts;
+
+if (search.trim()) {
+  localProducts = localProducts.filter((product) =>
+    product.title.toLowerCase().includes(search.toLowerCase())
+  );
+}
+
+if (category) {
+  localProducts = localProducts.filter(
+    (product) => product.category === category
+  );
+}
+
+let result = [...data.products, ...localProducts];
+
+if (localProducts.length > 0) {
+  setTotal(data.total + localProducts.length);
+} else {
+  
+}
       if (sortBy) {
         result.sort((a, b) => {
           let valueA = a[sortBy];
@@ -145,6 +168,13 @@ export default function Products() {
         <h1 className="text-3xl font-bold text-gray-800">
           Product Admin Dashboard
         </h1>
+
+        <a
+          href="/product/add"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-center"
+        >
+          + Add Product
+        </a>
 
         <div className="flex flex-col sm:flex-row gap-3">
           <input
@@ -234,14 +264,15 @@ export default function Products() {
                   />
                 </td>
 
-               <td className="p-4 font-medium">
-  <a
-    href={`/product/${product.id}`}
-    className="text-blue-600 hover:underline"
-  >
-    {product.title}
-  </a>
-</td>
+                <td className="p-4 font-medium">
+                  <a
+                    href={`/product/${product.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {product.title}
+                  </a>
+                </td>
+
                 <td className="p-4">{product.category}</td>
                 <td className="p-4">${product.price}</td>
                 <td className="p-4">⭐ {product.rating}</td>

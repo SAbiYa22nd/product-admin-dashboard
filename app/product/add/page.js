@@ -11,13 +11,14 @@ export default function AddProduct() {
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!title || !price || !category || !description) {
+    if (!title || !price || !category || !description || !image) {
       setError("Please fill all fields");
       return;
     }
@@ -31,12 +32,28 @@ export default function AddProduct() {
       setLoading(true);
       setError("");
 
-      await api.post("/products/add", {
+      const response = await api.post("/products/add", {
         title,
         price: Number(price),
         category,
         description,
       });
+
+      const newProduct = {
+        ...response.data,
+        thumbnail: image,
+        rating: 0,
+        stock: 0,
+      };
+
+      const existingProducts = JSON.parse(
+        localStorage.getItem("addedProducts") || "[]"
+      );
+
+      localStorage.setItem(
+        "addedProducts",
+        JSON.stringify([...existingProducts, newProduct])
+      );
 
       alert("Product added successfully");
       router.push("/products");
@@ -92,6 +109,14 @@ export default function AddProduct() {
             onChange={(e) => setDescription(e.target.value)}
             className="w-full border rounded-lg px-4 py-2"
             rows="4"
+          />
+
+          <input
+            type="url"
+            placeholder="Product image URL"
+            value={image}
+            onChange={(e) => setImage(e.target.value)}
+            className="w-full border rounded-lg px-4 py-2"
           />
 
           <button
