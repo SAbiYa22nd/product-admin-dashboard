@@ -18,6 +18,8 @@ export default function AddProduct() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (loading) return;
+
     if (!title || !price || !category || !description || !image) {
       setError("Please fill all fields");
       return;
@@ -41,9 +43,16 @@ export default function AddProduct() {
 
       const newProduct = {
         ...response.data,
+
+        // Give locally added products their own unique ID.
+        id: `local-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)}`,
+
         thumbnail: image,
         rating: 0,
         stock: 0,
+        reviews: [],
       };
 
       const existingProducts = JSON.parse(
@@ -52,12 +61,17 @@ export default function AddProduct() {
 
       localStorage.setItem(
         "addedProducts",
-        JSON.stringify([...existingProducts, newProduct])
+        JSON.stringify([
+          ...existingProducts,
+          newProduct,
+        ])
       );
 
       alert("Product added successfully");
+
       router.push("/products");
     } catch (error) {
+      console.error(error);
       setError("Failed to add product");
     } finally {
       setLoading(false);
@@ -67,6 +81,7 @@ export default function AddProduct() {
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-xl mx-auto bg-white rounded-xl shadow p-6">
+
         <h1 className="text-3xl font-bold mb-6">
           Add Product
         </h1>
@@ -77,7 +92,10 @@ export default function AddProduct() {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
 
           <input
             type="text"
@@ -104,7 +122,7 @@ export default function AddProduct() {
           />
 
           <textarea
-            placeholder="Description"
+            placeholder="Product description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full border rounded-lg px-4 py-2"

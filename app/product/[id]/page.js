@@ -12,15 +12,49 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const isLocalProduct = String(id).startsWith("local-");
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        setError("");
+
+        if (isLocalProduct) {
+          const localProducts = JSON.parse(
+            localStorage.getItem("addedProducts") || "[]"
+          );
+
+          const localProduct = localProducts.find(
+            (item) => String(item.id) === String(id)
+          );
+
+          if (!localProduct) {
+            setError("Product not found");
+            return;
+          }
+
+          setProduct(localProduct);
+          return;
+        }
 
         const response = await api.get(`/products/${id}`);
 
-        setProduct(response.data);
+        const editedProducts = JSON.parse(
+          localStorage.getItem("editedProducts") || "[]"
+        );
+
+        const editedProduct = editedProducts.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        setProduct(
+          editedProduct
+            ? { ...response.data, ...editedProduct }
+            : response.data
+        );
       } catch (error) {
+        console.error(error);
         setError("Product not found");
       } finally {
         setLoading(false);
@@ -30,7 +64,7 @@ export default function ProductDetails() {
     if (id) {
       fetchProduct();
     }
-  }, [id]);
+  }, [id, isLocalProduct]);
 
   const handleDelete = async () => {
     const confirmed = window.confirm(
@@ -40,11 +74,44 @@ export default function ProductDetails() {
     if (!confirmed) return;
 
     try {
+      if (isLocalProduct) {
+        const localProducts = JSON.parse(
+          localStorage.getItem("addedProducts") || "[]"
+        );
+
+        const updatedProducts = localProducts.filter(
+          (item) => String(item.id) !== String(id)
+        );
+
+        localStorage.setItem(
+          "addedProducts",
+          JSON.stringify(updatedProducts)
+        );
+
+        alert("Product deleted successfully");
+        router.push("/products");
+        return;
+      }
+
       await api.delete(`/products/${id}`);
+
+      const editedProducts = JSON.parse(
+        localStorage.getItem("editedProducts") || "[]"
+      );
+
+      const updatedEditedProducts = editedProducts.filter(
+        (item) => String(item.id) !== String(id)
+      );
+
+      localStorage.setItem(
+        "editedProducts",
+        JSON.stringify(updatedEditedProducts)
+      );
 
       alert("Product deleted successfully");
       router.push("/products");
     } catch (error) {
+      console.error(error);
       alert("Failed to delete product");
     }
   };
@@ -57,20 +124,23 @@ export default function ProductDetails() {
     );
   }
 
-  if (error) {
+  if (error || !product) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600 text-xl">{error}</p>
+        <p className="text-red-600 text-xl">
+          {error || "Product not found"}
+        </p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-gray-100 p-6">
+
       <div className="max-w-5xl mx-auto bg-white rounded-xl shadow p-6">
 
         <button
-          onClick={() => window.history.back()}
+          onClick={() => router.back()}
           className="mb-6 px-4 py-2 bg-gray-200 rounded-lg"
         >
           ← Back
@@ -87,6 +157,7 @@ export default function ProductDetails() {
           </div>
 
           <div>
+
             <h1 className="text-3xl font-bold mb-4">
               {product.title}
             </h1>
@@ -112,8 +183,11 @@ export default function ProductDetails() {
             </p>
 
             <div className="flex gap-4 mt-6">
+
               <button
-                onClick={() => router.push(`/product/${id}/edit`)}
+                onClick={() =>
+                  router.push(`/product/${id}/edit`)
+                }
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg"
               >
                 Edit
@@ -125,35 +199,47 @@ export default function ProductDetails() {
               >
                 Delete
               </button>
+
             </div>
           </div>
 
         </div>
 
         <div className="mt-8">
+
           <h2 className="text-2xl font-bold mb-4">
             Reviews
           </h2>
 
           {product.reviews?.length > 0 ? (
             <div className="space-y-4">
+
               {product.reviews.map((review, index) => (
-                <div key={index} className="border rounded-lg p-4">
+                <div
+                  key={index}
+                  className="border rounded-lg p-4"
+                >
                   <p className="font-semibold">
                     {review.reviewerName}
                   </p>
 
-                  <p>⭐ {review.rating}</p>
+                  <p>
+                    ⭐ {review.rating}
+                  </p>
 
                   <p className="text-gray-600">
                     {review.comment}
                   </p>
                 </div>
               ))}
+
             </div>
           ) : (
-            <p className="text-gray-500">No reviews available.</p>
+            <p className="text-gray-500">
+              No reviews available.
+            </p>
           )}
+
         </div>
 
       </div>

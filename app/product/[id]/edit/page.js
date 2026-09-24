@@ -17,17 +17,56 @@ export default function EditProduct() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const isLocalProduct = String(id).startsWith("local-");
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const response = await api.get(`/products/${id}`);
-        const product = response.data;
+        setLoading(true);
+        setError("");
 
-        setTitle(product.title);
-        setPrice(product.price);
-        setCategory(product.category);
-        setDescription(product.description);
+        if (isLocalProduct) {
+          const localProducts = JSON.parse(
+            localStorage.getItem("addedProducts") || "[]"
+          );
+
+          const product = localProducts.find(
+            (item) => String(item.id) === String(id)
+          );
+
+          if (!product) {
+            setError("Product not found");
+            return;
+          }
+
+          setTitle(product.title || "");
+          setPrice(product.price || "");
+          setCategory(product.category || "");
+          setDescription(product.description || "");
+
+          return;
+        }
+
+        const response = await api.get(`/products/${id}`);
+
+        const editedProducts = JSON.parse(
+          localStorage.getItem("editedProducts") || "[]"
+        );
+
+        const editedProduct = editedProducts.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        const product = editedProduct
+          ? { ...response.data, ...editedProduct }
+          : response.data;
+
+        setTitle(product.title || "");
+        setPrice(product.price || "");
+        setCategory(product.category || "");
+        setDescription(product.description || "");
       } catch (error) {
+        console.error(error);
         setError("Product not found");
       } finally {
         setLoading(false);
@@ -37,10 +76,12 @@ export default function EditProduct() {
     if (id) {
       fetchProduct();
     }
-  }, [id]);
+  }, [id, isLocalProduct]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (saving) return;
 
     if (!title || !price || !category || !description) {
       setError("Please fill all fields");
@@ -56,16 +97,70 @@ export default function EditProduct() {
       setSaving(true);
       setError("");
 
-      await api.put(`/products/${id}`, {
-        title,
-        price: Number(price),
-        category,
-        description,
-      });
+      if (isLocalProduct) {
+        const localProducts = JSON.parse(
+          localStorage.getItem("addedProducts") || "[]"
+        );
+
+        const updatedProducts = localProducts.map((product) => {
+          if (String(product.id) === String(id)) {
+            return {
+              ...product,
+              title,
+              price: Number(price),
+              category,
+              description,
+            };
+          }
+
+          return product;
+        });
+
+        localStorage.setItem(
+          "addedProducts",
+          JSON.stringify(updatedProducts)
+        );
+      } else {
+        await api.put(`/products/${id}`, {
+          title,
+          price: Number(price),
+          category,
+          description,
+        });
+
+        const editedProducts = JSON.parse(
+          localStorage.getItem("editedProducts") || "[]"
+        );
+
+        const updatedProduct = {
+          id: String(id),
+          title,
+          price: Number(price),
+          category,
+          description,
+        };
+
+        const existingIndex = editedProducts.findIndex(
+          (item) => String(item.id) === String(id)
+        );
+
+        if (existingIndex >= 0) {
+          editedProducts[existingIndex] = updatedProduct;
+        } else {
+          editedProducts.push(updatedProduct);
+        }
+
+        localStorage.setItem(
+          "editedProducts",
+          JSON.stringify(editedProducts)
+        );
+      }
 
       alert("Product updated successfully");
-      router.push(`/product/${id}`);
+
+      router.push("/products");
     } catch (error) {
+      console.error(error);
       setError("Failed to update product");
     } finally {
       setSaving(false);
@@ -91,6 +186,7 @@ export default function EditProduct() {
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-xl mx-auto bg-white rounded-xl shadow p-6">
+
         <h1 className="text-3xl font-bold mb-6">
           Edit Product
         </h1>
@@ -123,7 +219,7 @@ export default function EditProduct() {
             type="text"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category"
+            placeholder="Product category"
             className="w-full border rounded-lg px-4 py-2"
           />
 
