@@ -234,7 +234,14 @@ export default function Products() {
                   />
                 </td>
 
-                <td className="p-4 font-medium">{product.title}</td>
+               <td className="p-4 font-medium">
+  <a
+    href={`/product/${product.id}`}
+    className="text-blue-600 hover:underline"
+  >
+    {product.title}
+  </a>
+</td>
                 <td className="p-4">{product.category}</td>
                 <td className="p-4">${product.price}</td>
                 <td className="p-4">⭐ {product.rating}</td>
