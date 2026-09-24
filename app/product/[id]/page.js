@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import api from "@/app/services/api";
 
 export default function ProductDetails() {
   const { id } = useParams();
+  const router = useRouter();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,23 @@ export default function ProductDetails() {
       fetchProduct();
     }
   }, [id]);
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this product?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/products/${id}`);
+
+      alert("Product deleted successfully");
+      router.push("/products");
+    } catch (error) {
+      alert("Failed to delete product");
+    }
+  };
 
   if (loading) {
     return (
@@ -92,6 +110,22 @@ export default function ProductDetails() {
             <p className="mb-2">
               <strong>Stock:</strong> {product.stock}
             </p>
+
+            <div className="flex gap-4 mt-6">
+              <button
+                onClick={() => router.push(`/product/${id}/edit`)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                Edit
+              </button>
+
+              <button
+                onClick={handleDelete}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg"
+              >
+                Delete
+              </button>
+            </div>
           </div>
 
         </div>
