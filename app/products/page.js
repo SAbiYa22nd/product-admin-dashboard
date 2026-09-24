@@ -1,25 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import api from "@/app/services/api";
 
 export default function Products() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const getValidPage = () => {
+    const value = Number(searchParams.get("page"));
+    return Number.isInteger(value) && value > 0 ? value : 1;
+  };
+
+  const getValidPageSize = () => {
+    const value = Number(searchParams.get("pageSize"));
+    return [10, 20, 50].includes(value) ? value : 10;
+  };
+
+  const getValidSortBy = () => {
+    const value = searchParams.get("sortBy");
+    return ["", "title", "price", "rating"].includes(value)
+      ? value
+      : "";
+  };
+
+  const getValidSortOrder = () => {
+    const value = searchParams.get("sortOrder");
+    return ["asc", "desc"].includes(value) ? value : "asc";
+  };
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(getValidPage);
+  const [pageSize, setPageSize] = useState(getValidPageSize);
   const [total, setTotal] = useState(0);
 
-  const [search, setSearch] = useState("");
-  const [searchText, setSearchText] = useState("");
+  const initialSearch = searchParams.get("search") || "";
+
+  const [search, setSearch] = useState(initialSearch);
+  const [searchText, setSearchText] = useState(initialSearch);
 
   const [categories, setCategories] = useState([]);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(
+    searchParams.get("category") || ""
+  );
 
-  const [sortBy, setSortBy] = useState("");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortBy, setSortBy] = useState(getValidSortBy);
+  const [sortOrder, setSortOrder] = useState(getValidSortOrder);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -33,6 +63,42 @@ export default function Products() {
 
     loadCategories();
   }, []);
+
+  // Update URL whenever filters change.
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (page !== 1) {
+      params.set("page", page);
+    }
+
+    if (pageSize !== 10) {
+      params.set("pageSize", pageSize);
+    }
+
+    if (search.trim()) {
+      params.set("search", search);
+    }
+
+    if (category) {
+      params.set("category", category);
+    }
+
+    if (sortBy) {
+      params.set("sortBy", sortBy);
+    }
+
+    if (sortOrder !== "asc") {
+      params.set("sortOrder", sortOrder);
+    }
+
+    const query = params.toString();
+
+    router.replace(
+      query ? `/products?${query}` : "/products",
+      { scroll: false }
+    );
+  }, [page, pageSize, search, category, sortBy, sortOrder, router]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
