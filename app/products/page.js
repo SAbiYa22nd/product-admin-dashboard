@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import api from "@/app/services/api";
 
 const API_TOTAL_FALLBACK = 194;
 const LOCAL_ID_START = 195;
 
-export default function Products() {
+function Products() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestIdRef = useRef(0);
@@ -445,20 +445,6 @@ export default function Products() {
         return;
       }
 
-      /*
-       * IMPORTANT:
-       * API products occupy the first part of pagination.
-       * Local products start only after all API products.
-       *
-       * Example:
-       * API = 194
-       * Local = 3
-       * Page size = 10
-       *
-       * Page 19 = API 181-190
-       * Page 20 = API 191-194 + local 195-197
-       */
-
       let pageProducts = [];
 
       if (skip < apiTotal) {
@@ -511,11 +497,6 @@ export default function Products() {
           }));
       }
 
-      /*
-       * API already gives only the requested page.
-       * So don't sort the complete API dataset here.
-       * Local products remain after the API products.
-       */
       if (sortBy) {
         const apiPart = pageProducts.filter(
           (product) => !product.isLocal
@@ -1039,5 +1020,21 @@ export default function Products() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-slate-100">
+          <p className="text-base text-gray-500">
+            Loading products...
+          </p>
+        </main>
+      }
+    >
+      <Products />
+    </Suspense>
   );
 }
