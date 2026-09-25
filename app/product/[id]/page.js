@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -12,10 +13,49 @@ export default function ProductDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const getLocalProduct = () => {
+    try {
+      const storedProducts = JSON.parse(
+        localStorage.getItem("addedProducts") || "[]"
+      );
+
+      if (!Array.isArray(storedProducts)) {
+        return null;
+      }
+
+      const localId = String(id).replace("local-", "");
+
+      const foundProduct = storedProducts.find(
+        (item) => String(item.id) === localId
+      );
+
+      if (foundProduct) {
+        return foundProduct;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const fetchProduct = async () => {
     try {
       setLoading(true);
       setError("");
+
+      if (String(id).startsWith("local-")) {
+        const localProduct = getLocalProduct();
+
+        if (!localProduct) {
+          setProduct(null);
+          setError("NOT_FOUND");
+          return;
+        }
+
+        setProduct(localProduct);
+        return;
+      }
 
       const response = await api.get(`/products/${id}`);
       setProduct(response.data);
@@ -24,7 +64,9 @@ export default function ProductDetailsPage() {
         setProduct(null);
         setError("NOT_FOUND");
       } else {
-        setError("Something went wrong while loading the product.");
+        setError(
+          "Something went wrong while loading the product."
+        );
       }
     } finally {
       setLoading(false);
@@ -48,7 +90,9 @@ export default function ProductDetailsPage() {
   if (error === "NOT_FOUND") {
     return (
       <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold">Product Not Found</h1>
+        <h1 className="text-2xl font-bold">
+          Product Not Found
+        </h1>
 
         <p className="mt-2 text-gray-500">
           The product you are looking for does not exist.
@@ -89,10 +133,12 @@ export default function ProductDetailsPage() {
       </button>
 
       <div className="grid gap-8 md:grid-cols-2">
-        {/* Product Images */}
         <div>
           <img
-            src={product.images?.[0]}
+            src={
+              product.images?.[0] ||
+              product.thumbnail
+            }
             alt={product.title}
             className="h-80 w-full rounded-lg border object-contain"
           />
@@ -111,9 +157,10 @@ export default function ProductDetailsPage() {
           )}
         </div>
 
-        {/* Product Information */}
         <div>
-          <h1 className="text-3xl font-bold">{product.title}</h1>
+          <h1 className="text-3xl font-bold">
+            {product.title}
+          </h1>
 
           <p className="mt-2 text-gray-500">
             Category: {product.category}
@@ -129,7 +176,8 @@ export default function ProductDetailsPage() {
             </p>
 
             <p>
-              <strong>Rating:</strong> ⭐ {product.rating}
+              <strong>Rating:</strong> ⭐{" "}
+              {product.rating ?? 0}
             </p>
 
             <p>
@@ -139,9 +187,10 @@ export default function ProductDetailsPage() {
         </div>
       </div>
 
-      {/* Reviews */}
       <div className="mt-10">
-        <h2 className="mb-4 text-2xl font-bold">Reviews</h2>
+        <h2 className="mb-4 text-2xl font-bold">
+          Reviews
+        </h2>
 
         {product.reviews?.length > 0 ? (
           <div className="space-y-4">
@@ -151,9 +200,13 @@ export default function ProductDetailsPage() {
                 className="rounded-lg border p-4"
               >
                 <div className="flex justify-between">
-                  <strong>{review.reviewerName}</strong>
+                  <strong>
+                    {review.reviewerName}
+                  </strong>
 
-                  <span>⭐ {review.rating}</span>
+                  <span>
+                    ⭐ {review.rating}
+                  </span>
                 </div>
 
                 <p className="mt-2 text-gray-600">
@@ -175,3 +228,4 @@ export default function ProductDetailsPage() {
     </div>
   );
 }
+

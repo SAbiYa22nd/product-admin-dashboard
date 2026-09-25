@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import api from "@/app/services/api";
 
+const API_TOTAL_FALLBACK = 194;
+const LOCAL_ID_START = 195;
+
 export default function Products() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,6 +47,7 @@ export default function Products() {
 
   const [page, setPage] = useState(getValidPage);
   const [pageSize, setPageSize] = useState(getValidPageSize);
+
   const [total, setTotal] = useState(0);
 
   const [search, setSearch] = useState(initialSearch);
@@ -91,21 +95,57 @@ export default function Products() {
   useEffect(() => {
     if (!authenticated) return;
 
+    const urlPage = Number(searchParams.get("page"));
+
+    if (
+      searchParams.has("page") &&
+      (!Number.isInteger(urlPage) || urlPage < 1)
+    ) {
+      setPage(1);
+    }
+  }, [authenticated, searchParams]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+
     const params = new URLSearchParams();
 
-    if (page !== 1) params.set("page", page);
-    if (pageSize !== 10) params.set("pageSize", pageSize);
-    if (search.trim()) params.set("search", search);
-    if (category) params.set("category", category);
-    if (sortBy) params.set("sortBy", sortBy);
-    if (sortOrder !== "asc") params.set("sortOrder", sortOrder);
+    if (page !== 1) {
+      params.set("page", page);
+    }
+
+    if (pageSize !== 10) {
+      params.set("pageSize", pageSize);
+    }
+
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    if (category) {
+      params.set("category", category);
+    }
+
+    if (sortBy) {
+      params.set("sortBy", sortBy);
+    }
+
+    if (sortOrder !== "asc") {
+      params.set("sortOrder", sortOrder);
+    }
 
     const query = params.toString();
 
-    router.replace(
-      query ? `/products?${query}` : "/products",
-      { scroll: false }
-    );
+    const newUrl = query
+      ? `/products?${query}`
+      : "/products";
+
+    const currentUrl =
+      window.location.pathname + window.location.search;
+
+    if (currentUrl !== newUrl) {
+      router.replace(newUrl, { scroll: false });
+    }
   }, [
     page,
     pageSize,
@@ -121,7 +161,9 @@ export default function Products() {
     if (!authenticated) return;
 
     const timer = setTimeout(() => {
-      setSearch(searchText);
+      const trimmedSearch = searchText.trim();
+
+      setSearch(trimmedSearch);
       setPage(1);
     }, 400);
 
@@ -134,15 +176,19 @@ export default function Products() {
         localStorage.getItem("addedProducts") || "[]"
       );
 
-      if (!Array.isArray(storedProducts)) return [];
+      if (!Array.isArray(storedProducts)) {
+        return [];
+      }
 
       const uniqueProducts = [];
       const seen = new Set();
 
       storedProducts.forEach((product) => {
-        const key = `${String(product.id)}-${String(
-          product.title
-        ).toLowerCase()}`;
+        const title = String(product.title || "")
+          .trim()
+          .toLowerCase();
+
+        const key = `${String(product.id)}-${title}`;
 
         if (!seen.has(key)) {
           seen.add(key);
@@ -150,14 +196,80 @@ export default function Products() {
         }
       });
 
-      if (uniqueProducts.length !== storedProducts.length) {
-        localStorage.setItem(
-          "addedProducts",
-          JSON.stringify(uniqueProducts)
-        );
-      }
+      const usedIds = new Set();
 
-      return uniqueProducts;
+      uniqueProducts.forEach((product) => {
+        const id = Number(product.id);
+
+        if (
+          Number.isInteger(id) &&
+          id >= LOCAL_ID_START &&
+          !usedIds.has(id)
+        ) {
+          usedIds.add(id);
+        }
+      });
+
+      let nextId = LOCAL_ID_START;
+
+      const normalizedProducts = uniqueProducts.map((product) => {
+        const id = Number(product.id);
+
+        if (
+          Number.isInteger(id) &&
+          id >= LOCAL_ID_START &&
+          !usedIds.has(id)
+        ) {
+          usedIds.add(id);
+
+          return {
+            ...product,
+            id,
+            isLocal: true,
+          };
+        }
+
+        if (
+          Number.isInteger(id) &&
+          id >= LOCAL_ID_START &&
+          usedIds.has(id)
+        ) {
+          while (usedIds.has(nextId)) {
+            nextId++;
+          }
+
+          const newId = nextId;
+          usedIds.add(newId);
+          nextId++;
+
+          return {
+            ...product,
+            id: newId,
+            isLocal: true,
+          };
+        }
+
+        while (usedIds.has(nextId)) {
+          nextId++;
+        }
+
+        const newId = nextId;
+        usedIds.add(newId);
+        nextId++;
+
+        return {
+          ...product,
+          id: newId,
+          isLocal: true,
+        };
+      });
+
+      localStorage.setItem(
+        "addedProducts",
+        JSON.stringify(normalizedProducts)
+      );
+
+      return normalizedProducts;
     } catch {
       return [];
     }
@@ -169,7 +281,9 @@ export default function Products() {
         localStorage.getItem("editedProducts") || "[]"
       );
 
-      return Array.isArray(editedProducts) ? editedProducts : [];
+      return Array.isArray(editedProducts)
+        ? editedProducts
+        : [];
     } catch {
       return [];
     }
@@ -181,10 +295,43 @@ export default function Products() {
         localStorage.getItem("deletedProducts") || "[]"
       );
 
-      return Array.isArray(deletedProducts) ? deletedProducts : [];
+      return Array.isArray(deletedProducts)
+        ? deletedProducts
+        : [];
     } catch {
       return [];
     }
+  };
+
+  const sortProducts = (items) => {
+    if (!sortBy) {
+      return items;
+    }
+
+    return [...items].sort((a, b) => {
+      let valueA = a[sortBy];
+      let valueB = b[sortBy];
+
+      if (sortBy === "title") {
+        valueA = String(valueA || "").toLowerCase();
+        valueB = String(valueB || "").toLowerCase();
+      }
+
+      if (sortBy === "price" || sortBy === "rating") {
+        valueA = Number(valueA) || 0;
+        valueB = Number(valueB) || 0;
+      }
+
+      if (valueA < valueB) {
+        return sortOrder === "asc" ? -1 : 1;
+      }
+
+      if (valueA > valueB) {
+        return sortOrder === "asc" ? 1 : -1;
+      }
+
+      return 0;
+    });
   };
 
   const fetchProducts = async () => {
@@ -201,7 +348,7 @@ export default function Products() {
       if (search.trim()) {
         response = await api.get("/products/search", {
           params: {
-            q: search,
+            q: search.trim(),
             limit: pageSize,
             skip,
           },
@@ -225,20 +372,57 @@ export default function Products() {
         });
       }
 
-      if (currentRequestId !== requestIdRef.current) return;
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
 
       const data = response.data;
+
+      const apiTotal = Number(data.total) || API_TOTAL_FALLBACK;
+
       const editedProducts = getEditedProducts();
       const deletedProducts = getDeletedProducts();
 
-      const apiProducts = data.products
+      const localProducts = getLocalProducts();
+
+      const filteredLocalProducts = localProducts.filter(
+        (product) => {
+          if (
+            deletedProducts.includes(String(product.id)) ||
+            deletedProducts.includes(`local-${String(product.id)}`)
+          ) {
+            return false;
+          }
+
+          if (
+            search.trim() &&
+            !String(product.title || "")
+              .toLowerCase()
+              .includes(search.trim().toLowerCase())
+          ) {
+            return false;
+          }
+
+          if (
+            category &&
+            String(product.category) !== String(category)
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+
+      const apiProducts = (data.products || [])
         .filter(
           (product) =>
             !deletedProducts.includes(String(product.id))
         )
         .map((product) => {
           const editedProduct = editedProducts.find(
-            (item) => String(item.id) === String(product.id)
+            (item) =>
+              String(item.id) === String(product.id)
           );
 
           return {
@@ -248,77 +432,111 @@ export default function Products() {
           };
         });
 
-      let localProducts = getLocalProducts();
+      const combinedTotal =
+        apiTotal + filteredLocalProducts.length;
 
-      localProducts = localProducts.filter(
-        (product) =>
-          !deletedProducts.includes(String(product.id)) &&
-          !deletedProducts.includes(`local-${String(product.id)}`)
+      const totalPages = Math.max(
+        1,
+        Math.ceil(combinedTotal / pageSize)
       );
 
-      if (search.trim()) {
-        localProducts = localProducts.filter((product) =>
-          String(product.title)
-            .toLowerCase()
-            .includes(search.toLowerCase())
-        );
+      if (page > totalPages) {
+        setPage(totalPages);
+        return;
       }
 
-      if (category) {
-        localProducts = localProducts.filter(
-          (product) => product.category === category
+      /*
+       * IMPORTANT:
+       * API products occupy the first part of pagination.
+       * Local products start only after all API products.
+       *
+       * Example:
+       * API = 194
+       * Local = 3
+       * Page size = 10
+       *
+       * Page 19 = API 181-190
+       * Page 20 = API 191-194 + local 195-197
+       */
+
+      let pageProducts = [];
+
+      if (skip < apiTotal) {
+        const apiPart = apiProducts;
+
+        pageProducts = [...apiPart];
+
+        const apiItemsOnThisPage = Math.min(
+          apiTotal - skip,
+          pageSize
         );
+
+        const localItemsNeeded =
+          pageSize - apiItemsOnThisPage;
+
+        if (
+          localItemsNeeded > 0 &&
+          filteredLocalProducts.length > 0
+        ) {
+          const localStartIndex = Math.max(
+            0,
+            skip + apiItemsOnThisPage - apiTotal
+          );
+
+          const localPart =
+            filteredLocalProducts.slice(
+              localStartIndex,
+              localStartIndex + localItemsNeeded
+            );
+
+          pageProducts = [
+            ...pageProducts,
+            ...localPart.map((product) => ({
+              ...product,
+              isLocal: true,
+            })),
+          ];
+        }
+      } else {
+        const localStartIndex = skip - apiTotal;
+
+        pageProducts = filteredLocalProducts
+          .slice(
+            localStartIndex,
+            localStartIndex + pageSize
+          )
+          .map((product) => ({
+            ...product,
+            isLocal: true,
+          }));
       }
 
-      const localProductsWithFlag = localProducts.map((product) => ({
-        ...product,
-        isLocal: true,
-      }));
-
-      let result = [
-        ...apiProducts,
-        ...localProductsWithFlag,
-      ];
-
+      /*
+       * API already gives only the requested page.
+       * So don't sort the complete API dataset here.
+       * Local products remain after the API products.
+       */
       if (sortBy) {
-        result.sort((a, b) => {
-          let valueA = a[sortBy];
-          let valueB = b[sortBy];
+        const apiPart = pageProducts.filter(
+          (product) => !product.isLocal
+        );
 
-          if (sortBy === "title") {
-            valueA = String(valueA).toLowerCase();
-            valueB = String(valueB).toLowerCase();
-          }
+        const localPart = pageProducts.filter(
+          (product) => product.isLocal
+        );
 
-          if (valueA < valueB) {
-            return sortOrder === "asc" ? -1 : 1;
-          }
-
-          if (valueA > valueB) {
-            return sortOrder === "asc" ? 1 : -1;
-          }
-
-          return 0;
-        });
+        pageProducts = [
+          ...sortProducts(apiPart),
+          ...sortProducts(localPart),
+        ];
       }
 
-      setProducts(result);
-
-      const deletedFromCurrentResponse =
-        data.products.filter((product) =>
-          deletedProducts.includes(String(product.id))
-        ).length;
-
-      setTotal(
-        Math.max(
-          0,
-          data.total -
-            deletedFromCurrentResponse +
-            localProducts.length
-        )
-      );
+      setProducts(pageProducts);
+      setTotal(combinedTotal);
     } catch (error) {
-      if (currentRequestId !== requestIdRef.current) return;
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
 
       console.error(error);
       setError("Failed to load products");
@@ -358,15 +576,11 @@ export default function Products() {
   }, [authenticated]);
 
   const getProductLink = (product) => {
-    if (!product.isLocal) {
-      return `/product/${product.id}`;
+    if (product.isLocal) {
+      return `/product/local-${product.id}`;
     }
 
-    if (String(product.id).startsWith("local-")) {
-      return `/product/${product.id}`;
-    }
-
-    return `/product/local-${product.id}`;
+    return `/product/${product.id}`;
   };
 
   const totalPages = Math.max(
@@ -375,9 +589,14 @@ export default function Products() {
   );
 
   const startItem =
-    total === 0 ? 0 : (page - 1) * pageSize + 1;
+    total === 0
+      ? 0
+      : (page - 1) * pageSize + 1;
 
-  const endItem = Math.min(page * pageSize, total);
+  const endItem = Math.min(
+    page * pageSize,
+    total
+  );
 
   if (checkingAuth) {
     return (
@@ -389,13 +608,16 @@ export default function Products() {
     );
   }
 
-  if (!authenticated) return null;
+  if (!authenticated) {
+    return null;
+  }
 
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-100">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+
           <p className="text-base text-gray-500">
             Loading products...
           </p>
@@ -640,14 +862,17 @@ export default function Products() {
               <tbody>
                 {products.map((product, index) => (
                   <tr
-                    key={`${product.isLocal ? "local" : "api"}-${product.id}-${product.title}-${index}`}
+                    key={`${product.isLocal ? "local" : "api"}-${product.id}-${index}`}
                     className="border-t border-gray-100 hover:bg-blue-50/30 transition"
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                           <img
-                            src={product.thumbnail}
+                            src={
+                              product.thumbnail ||
+                              product.images?.[0]
+                            }
                             alt={product.title}
                             className="w-full h-full object-contain"
                           />
@@ -682,25 +907,11 @@ export default function Products() {
                       <span className="text-yellow-500">
                         ★
                       </span>{" "}
-                      {product.rating}
+                      {product.rating ?? 0}
                     </td>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                          product.stock > 20
-                            ? "bg-green-50 text-green-700"
-                            : product.stock > 0
-                            ? "bg-yellow-50 text-yellow-700"
-                            : "bg-red-50 text-red-700"
-                        }`}
-                      >
-                        {product.stock > 20
-                          ? "In Stock"
-                          : product.stock > 0
-                          ? "Low Stock"
-                          : "Out of Stock"}
-                      </span>
+                    <td className="px-5 py-4 text-base text-gray-700">
+                      {product.stock}
                     </td>
                   </tr>
                 ))}
@@ -711,13 +922,16 @@ export default function Products() {
           <div className="md:hidden p-4 space-y-3">
             {products.map((product, index) => (
               <div
-                key={`${product.isLocal ? "local" : "api"}-${product.id}-${product.title}-${index}`}
+                key={`${product.isLocal ? "local" : "api"}-${product.id}-${index}`}
                 className="border border-gray-200 rounded-xl p-4"
               >
                 <div className="flex gap-4">
                   <div className="w-20 h-20 bg-gray-50 border border-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                     <img
-                      src={product.thumbnail}
+                      src={
+                        product.thumbnail ||
+                        product.images?.[0]
+                      }
                       alt={product.title}
                       className="w-full h-full object-contain"
                     />
@@ -743,31 +957,13 @@ export default function Products() {
                       <span className="text-yellow-500">
                         ★
                       </span>{" "}
-                      {product.rating}
+                      {product.rating ?? 0}
                     </p>
                   </div>
                 </div>
 
-                <div className="border-t mt-4 pt-3 flex items-center justify-between text-sm">
-                  <span className="text-gray-500">
-                    Stock: {product.stock}
-                  </span>
-
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      product.stock > 20
-                        ? "bg-green-50 text-green-700"
-                        : product.stock > 0
-                        ? "bg-yellow-50 text-yellow-700"
-                        : "bg-red-50 text-red-700"
-                    }`}
-                  >
-                    {product.stock > 20
-                      ? "In Stock"
-                      : product.stock > 0
-                      ? "Low Stock"
-                      : "Out of Stock"}
-                  </span>
+                <div className="border-t mt-4 pt-3 text-sm text-gray-500">
+                  Stock: {product.stock}
                 </div>
               </div>
             ))}
@@ -775,9 +971,7 @@ export default function Products() {
 
           {products.length === 0 && (
             <div className="py-14 px-4 text-center">
-              <div className="text-4xl mb-3">
-                📦
-              </div>
+              <div className="text-4xl mb-3">📦</div>
 
               <h3 className="text-lg font-semibold text-gray-800">
                 No products found

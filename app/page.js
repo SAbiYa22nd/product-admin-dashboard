@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -14,17 +13,17 @@ export default function Home() {
 
     if (loggingIn) return;
 
-    if (!username || !password) {
+    if (!username.trim() || !password.trim()) {
       alert("Please enter username and password");
       return;
     }
 
-    try {
-      setLoggingIn(true);
+    setLoggingIn(true);
 
+    try {
       const response = await api.post("/auth/login", {
-        username: username,
-        password: password,
+        username: username.trim(),
+        password,
       });
 
       localStorage.setItem("token", response.data.accessToken);

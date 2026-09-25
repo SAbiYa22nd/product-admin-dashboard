@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Product Admin Dashboard
+
+A responsive Product Admin Dashboard built using Next.js, React, Tailwind CSS, Axios, and the DummyJSON API.
+
+## Features
+
+* User login using DummyJSON authentication
+* Protected product dashboard
+* Logout
+* Product listing with:
+
+  * Product image
+  * Title
+  * Category
+  * Price
+  * Rating
+  * Stock
+* Responsive desktop table and mobile card layout
+* Pagination using API `limit` and `skip`
+* Page sizes: 10, 20, and 50
+* Previous and Next buttons
+* Page numbers
+* Search using DummyJSON search API
+* Debounced search
+* Category filtering
+* Sorting by title, price, and rating
+* Ascending and descending sorting
+* Search, category, sorting, page, and page size stored in the URL
+* Product details page
+* Add product
+* Edit product
+* Delete product with confirmation
+* Form validation
+* Loading states
+* Empty states
+* Error states with Retry
+* Shared Axios configuration
+* Authentication token added to API requests
+* Protection against outdated search responses
+
+## Technologies Used
+
+* Next.js
+* React
+* Tailwind CSS
+* Axios
+* JavaScript
+* DummyJSON API
+
+## Login Credentials
+
+Use the following DummyJSON test credentials:
+
+**Username:** `emilys`
+
+**Password:** `emilyspass`
+
+## API
+
+The project uses the DummyJSON API:
+
+`https://dummyjson.com`
+
+Main endpoints used:
+
+* `POST /auth/login`
+* `GET /products`
+* `GET /products/search?q=`
+* `GET /products/categories`
+* `GET /products/category/:category`
+* `GET /products/:id`
+* `POST /products/add`
+* `PUT /products/:id`
+* `DELETE /products/:id`
 
 ## Getting Started
 
-First, run the development server:
+Install the dependencies:
+
+```bash
+npm install
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+`http://localhost:3000`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Implementation Notes
 
-## Learn More
+### Search and Category Filter
 
-To learn more about Next.js, take a look at the following resources:
+The DummyJSON API provides separate endpoints for searching products and filtering products by category.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The application uses the search endpoint when a search term is entered. When there is no search term, the selected category endpoint is used.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This avoids combining incompatible search and category API requests.
 
-## Deploy on Vercel
+### Add, Edit and Delete
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+DummyJSON product mutation endpoints simulate changes but do not permanently update the public dataset.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To keep added, edited, and deleted products visible in the application, the application maintains these changes using browser `localStorage`.
+
+### Debounced Search
+
+Search input is debounced to avoid sending an API request for every keystroke.
+
+A request ID check is also used so that an older, slower response cannot overwrite the result of a newer search request.
+
+### URL State
+
+Pagination, page size, search, category, sorting field, and sorting order are reflected in the URL.
+
+Invalid URL values are handled so that incorrect values do not break the application.
+
+### Duplicate Requests
+
+Login and save actions are disabled while their requests are in progress to prevent repeated submissions.
+
+## AI Assistance
+
+AI tools were used during development for debugging, implementation guidance, and understanding errors.
+
+The implemented functionality was reviewed and tested during development.
