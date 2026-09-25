@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import api from "@/app/services/api";
+import api from "../../services/api";
 
-export default function ProductDetails() {
+export default function ProductDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
 
@@ -12,237 +12,166 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const isLocalProduct = String(id).startsWith("local-");
-
-  useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        if (isLocalProduct) {
-          const localProducts = JSON.parse(
-            localStorage.getItem("addedProducts") || "[]"
-          );
-
-          const localProduct = localProducts.find(
-            (item) => String(item.id) === String(id)
-          );
-
-          if (!localProduct) {
-            setError("Product not found");
-            return;
-          }
-
-          setProduct(localProduct);
-          return;
-        }
-
-        const response = await api.get(`/products/${id}`);
-
-        const editedProducts = JSON.parse(
-          localStorage.getItem("editedProducts") || "[]"
-        );
-
-        const editedProduct = editedProducts.find(
-          (item) => String(item.id) === String(id)
-        );
-
-        setProduct(
-          editedProduct
-            ? { ...response.data, ...editedProduct }
-            : response.data
-        );
-      } catch (error) {
-        console.error(error);
-        setError("Product not found");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchProduct();
-    }
-  }, [id, isLocalProduct]);
-
-  const handleDelete = async () => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this product?"
-    );
-
-    if (!confirmed) return;
-
+  const fetchProduct = async () => {
     try {
-      if (isLocalProduct) {
-        const localProducts = JSON.parse(
-          localStorage.getItem("addedProducts") || "[]"
-        );
+      setLoading(true);
+      setError("");
 
-        const updatedProducts = localProducts.filter(
-          (item) => String(item.id) !== String(id)
-        );
-
-        localStorage.setItem(
-          "addedProducts",
-          JSON.stringify(updatedProducts)
-        );
-
-        alert("Product deleted successfully");
-        router.push("/products");
-        return;
+      const response = await api.get(`/products/${id}`);
+      setProduct(response.data);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setProduct(null);
+        setError("NOT_FOUND");
+      } else {
+        setError("Something went wrong while loading the product.");
       }
-
-      await api.delete(`/products/${id}`);
-
-      const editedProducts = JSON.parse(
-        localStorage.getItem("editedProducts") || "[]"
-      );
-
-      const updatedEditedProducts = editedProducts.filter(
-        (item) => String(item.id) !== String(id)
-      );
-
-      localStorage.setItem(
-        "editedProducts",
-        JSON.stringify(updatedEditedProducts)
-      );
-
-      alert("Product deleted successfully");
-      router.push("/products");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to delete product");
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (id) {
+      fetchProduct();
+    }
+  }, [id]);
+
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <div className="p-6 text-center">
         <p>Loading product...</p>
-      </main>
+      </div>
     );
   }
 
-  if (error || !product) {
+  if (error === "NOT_FOUND") {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600 text-xl">
-          {error || "Product not found"}
+      <div className="p-6 text-center">
+        <h1 className="text-2xl font-bold">Product Not Found</h1>
+
+        <p className="mt-2 text-gray-500">
+          The product you are looking for does not exist.
         </p>
-      </main>
+
+        <button
+          onClick={() => router.back()}
+          className="mt-4 rounded bg-black px-4 py-2 text-white"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <p className="mb-4 text-red-500">{error}</p>
+
+        <button
+          onClick={fetchProduct}
+          className="rounded bg-black px-4 py-2 text-white"
+        >
+          Retry
+        </button>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <div className="mx-auto max-w-6xl p-6">
+      <button
+        onClick={() => router.back()}
+        className="mb-6 rounded border px-4 py-2"
+      >
+        ← Back
+      </button>
 
-      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow p-6">
+      <div className="grid gap-8 md:grid-cols-2">
+        {/* Product Images */}
+        <div>
+          <img
+            src={product.images?.[0]}
+            alt={product.title}
+            className="h-80 w-full rounded-lg border object-contain"
+          />
 
-        <button
-          onClick={() => router.back()}
-          className="mb-6 px-4 py-2 bg-gray-200 rounded-lg"
-        >
-          ← Back
-        </button>
+          {product.images?.length > 1 && (
+            <div className="mt-4 flex gap-3 overflow-x-auto">
+              {product.images.map((image, index) => (
+                <img
+                  key={index}
+                  src={image}
+                  alt={`${product.title} ${index + 1}`}
+                  className="h-20 w-20 rounded border object-cover"
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        {/* Product Information */}
+        <div>
+          <h1 className="text-3xl font-bold">{product.title}</h1>
 
-          <div>
-            <img
-              src={product.thumbnail}
-              alt={product.title}
-              className="w-full h-80 object-contain"
-            />
-          </div>
+          <p className="mt-2 text-gray-500">
+            Category: {product.category}
+          </p>
 
-          <div>
+          <p className="mt-4 text-gray-700">
+            {product.description}
+          </p>
 
-            <h1 className="text-3xl font-bold mb-4">
-              {product.title}
-            </h1>
-
-            <p className="text-gray-600 mb-4">
-              {product.description}
+          <div className="mt-6 space-y-3">
+            <p>
+              <strong>Price:</strong> ${product.price}
             </p>
 
-            <p className="text-2xl font-bold mb-3">
-              ${product.price}
-            </p>
-
-            <p className="mb-2">
-              <strong>Category:</strong> {product.category}
-            </p>
-
-            <p className="mb-2">
+            <p>
               <strong>Rating:</strong> ⭐ {product.rating}
             </p>
 
-            <p className="mb-2">
+            <p>
               <strong>Stock:</strong> {product.stock}
             </p>
-
-            <div className="flex gap-4 mt-6">
-
-              <button
-                onClick={() =>
-                  router.push(`/product/${id}/edit`)
-                }
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg"
-              >
-                Edit
-              </button>
-
-              <button
-                onClick={handleDelete}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg"
-              >
-                Delete
-              </button>
-
-            </div>
           </div>
-
         </div>
-
-        <div className="mt-8">
-
-          <h2 className="text-2xl font-bold mb-4">
-            Reviews
-          </h2>
-
-          {product.reviews?.length > 0 ? (
-            <div className="space-y-4">
-
-              {product.reviews.map((review, index) => (
-                <div
-                  key={index}
-                  className="border rounded-lg p-4"
-                >
-                  <p className="font-semibold">
-                    {review.reviewerName}
-                  </p>
-
-                  <p>
-                    ⭐ {review.rating}
-                  </p>
-
-                  <p className="text-gray-600">
-                    {review.comment}
-                  </p>
-                </div>
-              ))}
-
-            </div>
-          ) : (
-            <p className="text-gray-500">
-              No reviews available.
-            </p>
-          )}
-
-        </div>
-
       </div>
-    </main>
+
+      {/* Reviews */}
+      <div className="mt-10">
+        <h2 className="mb-4 text-2xl font-bold">Reviews</h2>
+
+        {product.reviews?.length > 0 ? (
+          <div className="space-y-4">
+            {product.reviews.map((review, index) => (
+              <div
+                key={index}
+                className="rounded-lg border p-4"
+              >
+                <div className="flex justify-between">
+                  <strong>{review.reviewerName}</strong>
+
+                  <span>⭐ {review.rating}</span>
+                </div>
+
+                <p className="mt-2 text-gray-600">
+                  {review.comment}
+                </p>
+
+                <p className="mt-1 text-sm text-gray-400">
+                  {review.date}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">
+            No reviews found.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

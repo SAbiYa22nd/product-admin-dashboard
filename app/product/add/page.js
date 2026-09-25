@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/app/services/api";
 
 export default function AddProduct() {
   const router = useRouter();
+
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
@@ -14,6 +17,18 @@ export default function AddProduct() {
   const [image, setImage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/");
+      return;
+    }
+
+    setAuthenticated(true);
+    setCheckingAuth(false);
+  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,12 +58,9 @@ export default function AddProduct() {
 
       const newProduct = {
         ...response.data,
-
-        // Give locally added products their own unique ID.
         id: `local-${Date.now()}-${Math.random()
           .toString(36)
           .substring(2, 8)}`,
-
         thumbnail: image,
         rating: 0,
         stock: 0,
@@ -77,6 +89,18 @@ export default function AddProduct() {
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p>Checking login...</p>
+      </main>
+    );
+  }
+
+  if (!authenticated) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-gray-100 p-6">
